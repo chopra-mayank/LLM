@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import "./App.css";
 
@@ -10,6 +10,15 @@ export default function App() {
     durationType: "days",
     durationValue: 1,
   });
+
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const cityFromURL = params.get("city");
+  if (cityFromURL) {
+    setFormData((prev) => ({ ...prev, location: cityFromURL }));
+  }
+}, []);
+
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
