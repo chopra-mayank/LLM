@@ -17,10 +17,16 @@ export default function App() {
       numberOfPeople: 1,
       durationType: "days",
       durationValue: 1,
+      rainTolerance: "strict",
+      travelerType: "solo",
     };
   };
+
   const [tweakPrompt, setTweakPrompt] = useState("");
-const [tweaking, setTweaking] = useState(false);
+  const [tweaking, setTweaking] = useState(false);
+  const [tweakStatus, setTweakStatus] = useState("");
+  const [tweakStatusType, setTweakStatusType] = useState("");
+  const [showTweakExamples, setShowTweakExamples] = useState(false);
 
   const [formData, setFormData] = useState(getInitialFormData);
   const [loading, setLoading] = useState(false);
@@ -28,6 +34,17 @@ const [tweaking, setTweaking] = useState(false);
   const [result, setResult] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [showResult, setShowResult] = useState(false);
+
+  const tweakExamples = [
+    "Make Day 2 more relaxing with spa activities",
+    "Add more local food experiences to Day 1",
+    "Replace indoor activities with outdoor adventures",
+    "Include more cultural and heritage sites",
+    "Add shopping destinations to the itinerary",
+    "Focus on budget-friendly activities",
+    "Include more photography spots",
+    "Add romantic dinner options for couples"
+  ];
 
   const handleMoveUp = (dayIndex, actIndex) => {
     const updatedResult = { ...result };
@@ -55,7 +72,8 @@ const [tweaking, setTweaking] = useState(false);
   };
 
   const handleAddSuggestion = (suggestionText, dayNum) => {
-    if (![1, 2, 3].includes(dayNum)) return;
+    const totalDays = result.finalItinerary.days.length;
+    if (dayNum < 1 || dayNum > totalDays) return;
 
     const updatedResult = { ...result };
     const targetDay = updatedResult.finalItinerary.days.find(d => d.dayNumber === dayNum);
@@ -84,35 +102,63 @@ const [tweaking, setTweaking] = useState(false);
   };
 
   const handleTweakSubmit = async () => {
-  if (!tweakPrompt.trim() || !result) return;
+    if (!tweakPrompt.trim() || !result) return;
 
-  setTweaking(true);
-  try {
-    const res = await fetch("http://localhost:5000/api/itinerary/tweak", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        finalItinerary: result.finalItinerary,
-        userInput: result.userInput,
-        tweakPrompt: tweakPrompt,
-      }),
-    });
+    setTweaking(true);
+    setTweakStatusType("loading");
+    setTweakStatus("Applying your changes...");
 
-    if (!res.ok) throw new Error("Tweak failed");
-    const updated = await res.json();
-    setResult((prev) => ({
-      ...prev,
-      finalItinerary: updated.finalItinerary,
-    }));
-    setTweakPrompt(""); // clear input
-  } catch (err) {
-    alert("Error tweaking itinerary. Please try again.");
-    console.error("Tweak Error:", err);
-  } finally {
-    setTweaking(false);
-  }
-};
+    try {
+      const res = await fetch("http://localhost:5000/api/itinerary/tweak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          finalItinerary: result.finalItinerary,
+          userInput: result.userInput,
+          tweakPrompt: tweakPrompt,
+        }),
+      });
 
+      if (!res.ok) throw new Error("Tweak failed");
+      const updated = await res.json();
+      setResult((prev) => ({
+        ...prev,
+        finalItinerary: updated.finalItinerary,
+      }));
+      
+      setTweakPrompt("");
+      setTweakStatusType("success");
+      setTweakStatus("Itinerary updated successfully!");
+      
+      setTimeout(() => {
+        setTweakStatus("");
+        setTweakStatusType("");
+      }, 3000);
+    } catch (err) {
+      setTweakStatusType("error");
+      setTweakStatus("Failed to update itinerary. Please try again.");
+      console.error("Tweak Error:", err);
+      
+      setTimeout(() => {
+        setTweakStatus("");
+        setTweakStatusType("");
+      }, 5000);
+    } finally {
+      setTweaking(false);
+    }
+  };
+
+  const handleTweakExampleClick = (example) => {
+    setTweakPrompt(example);
+    setShowTweakExamples(false);
+  };
+
+  const handleTweakKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleTweakSubmit();
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -137,6 +183,8 @@ const [tweaking, setTweaking] = useState(false);
             type: formData.durationType,
             value: formData.durationValue,
           },
+          rainTolerance: formData.rainTolerance || "strict",
+          travelerType: formData.travelerType || "solo",
         }),
       });
 
@@ -294,6 +342,40 @@ const [tweaking, setTweaking] = useState(false);
                   </motion.button>
                 ))}
               </div>
+              <div className="input-group">
+                <label className="input-label">
+                  🧍 What kind of traveler are you?
+                </label>
+                <select
+                  name="travelerType"
+                  className="modern-input"
+                  value={formData.travelerType}
+                  onChange={handleChange}
+                >
+                  <option value="solo">Solo Explorer</option>
+                  <option value="family">Family Trip</option>
+                  <option value="couple">Romantic Couple</option>
+                  <option value="adventure">Adventurous</option>
+                  <option value="luxury">Luxury Seeker</option>
+                  <option value="senior">Senior Friendly</option>
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">
+                  🌦️ How should we handle rainy days?
+                </label>
+                <select
+                  name="rainTolerance"
+                  className="modern-input"
+                  value={formData.rainTolerance || "strict"}
+                  onChange={handleChange}
+                >
+                  <option value="strict">Avoid all outdoor activities (Strict)</option>
+                  <option value="flexible">Allow light outdoor activities (Flexible)</option>
+                  <option value="ignore">Ignore rain forecasts (Ignore)</option>
+                </select>
+              </div>
             </div>
           </motion.div>
         );
@@ -406,7 +488,12 @@ const [tweaking, setTweaking] = useState(false);
               className="day-card"
             >
               <div className="day-header">
-                <div className="day-number">Day {day.dayNumber}</div>
+                <div className="day-number">
+                  Day {day.dayNumber}
+                  <span style={{ marginLeft: "0.5rem" }}>
+                    {day.weather === "rainy" ? "🌧️" : "☀️"}
+                  </span>
+                </div>
                 <div className="activity-count">{day.activities.length} experiences</div>
               </div>
               <div className="activities">
@@ -426,7 +513,17 @@ const [tweaking, setTweaking] = useState(false);
                         activity.description.toLowerCase().includes('hotel') ? '🏨' : '📍'}
                     </div>
                     <div className="activity-content">
-                      <p className="activity-text">{activity.description}</p>
+                      <p className="activity-text">
+                        {activity.description}
+                        {activity.timeOfDay && (
+                          <span className="time-badge" style={{ marginLeft: "0.5rem", fontWeight: "bold" }}>
+                            {activity.timeOfDay === 'morning' && '🌅 Morning'}
+                            {activity.timeOfDay === 'afternoon' && '🏞️ Afternoon'}
+                            {activity.timeOfDay === 'evening' && '🌙 Evening'}
+                          </span>
+                        )}
+                      </p>
+
                       <div className="activity-actions">
                         <button
                           onClick={() => handleMoveUp(index, actIndex)}
@@ -457,34 +554,126 @@ const [tweaking, setTweaking] = useState(false);
             transition={{ delay: 0.3 }}
             className="suggestions-card"
           >
-            <div className="tweak-box" style={{ marginTop: "2rem" }}>
-  <h3>✏️ Tweak Itinerary</h3>
-  <input
-    type="text"
-    placeholder="e.g., Make Day 2 more relaxing"
-    value={tweakPrompt}
-    onChange={(e) => setTweakPrompt(e.target.value)}
-    className="form-input"
-  />
-  {tweaking && (
-  <p style={{ marginTop: "0.5rem", color: "#6b7280" }}>
-    ✨ Applying your changes...
-  </p>
-)}
-  <button
-    className="action-btn"
-    onClick={handleTweakSubmit}
-    disabled={!tweakPrompt.trim()}
-    style={{ marginLeft: "1rem" }}
-  >
-    🔄 Apply Tweak
-  </button>
-</div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="tweak-box"
+            >
+              <div className="tweak-header">
+                <h3 className="tweak-title">
+                  ✏️ Tweak Your Itinerary
+                </h3>
+              </div>
+              
+              <p className="tweak-subtitle">
+                Tell us what you'd like to change, and our AI will adjust your itinerary accordingly. 
+                Be specific about which day or what type of activities you want to modify.
+              </p>
+
+              <div className="tweak-input-wrapper">
+                <div className="tweak-input-container">
+                  <span className="tweak-input-icon">💭</span>
+                  <input
+                    type="text"
+                    className="tweak-input"
+                    placeholder="e.g., Make Day 2 more relaxing, add more food experiences..."
+                    value={tweakPrompt}
+                    onChange={(e) => setTweakPrompt(e.target.value)}
+                    onKeyPress={handleTweakKeyPress}
+                    maxLength={220}
+                    disabled={tweaking}
+                  />
+                </div>
+                
+                <div className={`tweak-char-counter ${tweakPrompt.length > 160 ? (tweakPrompt.length > 200 ? 'error' : 'warning') : ''}`}>
+                  {tweakPrompt.length}/200
+                </div>
+              </div>
+
+              <div className="tweak-actions">
+                <motion.button
+                  className="tweak-btn tweak-btn-primary"
+                  onClick={handleTweakSubmit}
+                  disabled={!tweakPrompt.trim() || tweakPrompt.length > 200 || tweaking}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {tweaking ? (
+                    <>
+                      <div className="tweak-spinner" />
+                      Applying Changes...
+                    </>
+                  ) : (
+                    <>
+                      🔄 Apply Tweak
+                    </>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  className="tweak-btn tweak-btn-secondary"
+                  onClick={() => setShowTweakExamples(!showTweakExamples)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  💡 {showTweakExamples ? 'Hide' : 'Show'} Examples
+                </motion.button>
+              </div>
+
+              <AnimatePresence>
+                {tweakStatus && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className={`tweak-status ${tweakStatusType}`}
+                  >
+                    {tweakStatusType === 'loading' && <div className="tweak-spinner" />}
+                    {tweakStatusType === 'success' && <span>✅</span>}
+                    {tweakStatusType === 'error' && <span>❌</span>}
+                    {tweakStatus}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {showTweakExamples && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="tweak-examples"
+                  >
+                    <div className="tweak-examples-title">
+                      💡 Try these examples:
+                    </div>
+                    <div className="tweak-examples-list">
+                      {tweakExamples.map((example, index) => (
+                        <motion.div
+                          key={index}
+                          className="tweak-example"
+                          onClick={() => handleTweakExampleClick(example)}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          "{example}"
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
 
             <h2 className="suggestions-title">🧠 More Amazing Experiences</h2>
             <div className="suggestions-list">
               {result.suggestions.map((item, index) => {
                 const isAlreadyAdded = addedSuggestions.includes(item);
+                const totalDays = result.finalItinerary.days.length;
                 return (
                   <div key={index} className="suggestion-item">
                     <span className="suggestion-text">✨ {item}</span>
@@ -500,7 +689,7 @@ const [tweaking, setTweaking] = useState(false);
                       <option value="" disabled>
                         Add to Day
                       </option>
-                      {[1, 2, 3].map(day => (
+                      {Array.from({ length: totalDays }, (_, index) => index + 1).map(day => (
                         <option key={day} value={day}>Day {day}</option>
                       ))}
                     </select>

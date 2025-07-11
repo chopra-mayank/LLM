@@ -1,4 +1,3 @@
-// agents/tweakAgent.js
 import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
@@ -73,16 +72,17 @@ ${JSON.stringify(finalItinerary, null, 2)}
     );
 
     const content = response.data.choices[0].message.content.trim();
+    const jsonStart = content.indexOf("{");
+    const jsonEnd = content.lastIndexOf("}") + 1;
+    const jsonString = content.substring(jsonStart, jsonEnd);
 
-    // Try-catch JSON parsing explicitly
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(jsonString);
     } catch (jsonErr) {
-      console.error("Invalid JSON from LLM:", content);
+      console.error("Invalid JSON extracted from LLM:", jsonString);
       throw new Error("LLM output is not valid JSON.");
     }
-
     return {
       ...state,
       finalItinerary: parsed,

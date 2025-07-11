@@ -1,0 +1,128 @@
+import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
+
+export async function eventPlanner(state) {
+  console.log("Event Planner Running - Generating Itinerary with LLM...");
+
+  const { userInput } = state;
+  const { location, numberOfPeople, duration, preferences } = userInput;
+
+
+  // Construct the prompt for the LLM to generate the itinerary
+const prompt = `
+You are an expert event planner specializing in creating detailed day-wise itineraries for corporate events.
+Based on the following inputs, generate a precise, day-wise itinerary of places and activities.
+
+---
+**User Input:**
+* **Location:** ${location}
+* **Number of People:** ${numberOfPeople}
+* **Duration:** ${duration.value} ${duration.type}
+* **Preferences:** ${preferences.join(", ")}
+
+---
+**Instructions for Output:**
+- Provide the itinerary as a plain text, structured day-wise.
+- For each day, list 1–3 highly suitable activities or places.
+- The output must NOT contain any introductory or closing lines — just the itinerary.
+
+🔔 It is **mandatory** that each activity ends with a time-of-day label in parentheses — either **(morning)**, **(afternoon)**, or **(evening)**. This is required for parsing purposes.
+
+✅ Example Format:
+Day 1  
+1. Visit City Palace for a historic tour and panoramic views. (morning)  
+2. Experience a serene boat ride on Lake Pichola. (afternoon)  
+3. Attend a cultural folk music and dance performance at Bagore Ki Haveli. (evening)
+
+Day 2  
+1. Explore Sajjangarh Monsoon Palace for sunset views. (evening)  
+2. Participate in a traditional Rajasthani cooking workshop. (afternoon)  
+3. Team dinner at a rooftop restaurant overlooking the lake. (evening)
+`;
+
+  try {
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama3-70b-8192", // Using llama3-70b-8192 as requested
+        messages: [
+          {
+            role: "system",
+            content: "You are a highly detailed and structured itinerary generator for corporate events.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7, // Adjust temperature for creativity vs. consistency
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`, // Ensure this is available
+        },
+      }
+    );
+
+    const rawItineraryText = response.data.choices[0].message.content;
+    // console.log("Raw Itinerary Text from LLM:\n", rawItineraryText);
+
+    // Parse the raw itinerary text into the structured format
+    const parsedDays = [];
+    const lines = rawItineraryText.split('\n').filter(line => line.trim() !== '');
+
+    let currentDayActivities = [];
+    let currentDayNumber = 0;
+
+    for (const line of lines) {
+  if (line.startsWith('Day ')) {
+    if (currentDayActivities.length > 0) {
+      parsedDays.push({
+        dayNumber: currentDayNumber,
+        activities: currentDayActivities,
+      });
+    }
+    currentDayNumber = parseInt(line.replace('Day ', '').trim());
+    currentDayActivities = [];
+  } else if (line.match(/^\d+\.\s/)) {
+    // Parse activity line
+    const activityText = line.replace(/^\d+\.\s*/, '').trim();
+    const match = activityText.match(/\((morning|afternoon|evening)\)$/i);
+
+    currentDayActivities.push({
+      description: activityText.replace(/\s*\((morning|afternoon|evening)\)$/i, '').trim(),
+      timeOfDay: match ? match[1].toLowerCase() : undefined,
+    });
+  }
+}
+
+    // Add the last day's activities
+    if (currentDayActivities.length > 0) {
+      parsedDays.push({
+        dayNumber: currentDayNumber,
+        activities: currentDayActivities,
+      });
+    }
+
+    const finalItinerary = {
+      duration: userInput.duration, // Keep the duration from userInput
+      days: parsedDays,
+    };
+
+    return {
+      ...state, // Preserve existing state
+      finalItinerary: finalItinerary,
+      nextAction: "END", // End the workflow after generating the itinerary
+      error: undefined, // Clear any errors
+    };
+  } catch (error) {
+    console.error("Groq API Error in Event Planner:", error.response?.data || error.message);
+    return {
+      ...state,
+      error: `Failed to generate itinerary: ${error.response?.data?.error?.message || error.message}`,
+      nextAction: "END",
+    };
+  }
+}
