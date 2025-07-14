@@ -10,7 +10,7 @@ app.use(express.json());
 app.use("/api/itinerary", itineraryRoute);
 app.use("/api/tavily", activity);
 
-const PORT = process.env.PORT || 5000;
+const PORT = 5000;
 
 app.listen(PORT, () => {
   
